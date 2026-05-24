@@ -298,9 +298,10 @@ Abra o arquivo `dashboard_cavalo.html` em qualquer navegador. Antes da primeira 
 ## Estrutura do repositório
 
 ```
-├── Cavalo_v2c.json          # Workflow principal (n8n)
-├── dashboard_cavalo.html    # Dashboard de monitoramento
-├── schema_rbmc.sql          # CREATE TABLE (Postgres)
+├── TG_ADS.json                  # Workflow principal (n8n)
+├── index.html                   # Dashboard de monitoramento
+├── schema_rbmc_Postgres.sql     # CREATE TABLE (Postgres)
+├── schema_rbmc_MySQL.sql        # CREATE TABLE (Postgres)
 └── README.md
 ```
 
