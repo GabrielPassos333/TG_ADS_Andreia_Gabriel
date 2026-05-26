@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RBMC · Monitor de Processamento</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="config.js"></script>
+</head>
+<body>
+
+<div id="config-banner" class="config-banner">
+  ⚠ Chave de API não configurada. Abra o arquivo, localize CONFIG no topo do script e insira sua anon key do Supabase.
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">RBMC · PPP Monitor</div>
+    <h1>Processamento geodésico</h1>
+    <div class="header-sub" id="header-sub">carregando...</div>
+  </div>
+  <div class="header-right">
+    <select id="sel-estacao"><option value="">Todas as estações</option></select>
+    <select id="sel-ano"><option value="">Todos os anos</option></select>
+    <button class="btn-refresh" onclick="loadAll()">↺ Atualizar</button>
+  </div>
+</div>
+
+<div class="metrics">
+  <div class="metric total">
+    <div class="metric-label">Total de registros</div>
+    <div class="metric-value" id="m-total">—</div>
+    <div class="metric-sub" id="m-total-sub">dias cadastrados</div>
+  </div>
+  <div class="metric ok">
+    <div class="metric-label">Concluídos</div>
+    <div class="metric-value" id="m-ok">—</div>
+    <div class="metric-sub" id="m-ok-pct">todas etapas ok</div>
+  </div>
+  <div class="metric err">
+    <div class="metric-label">Com erro</div>
+    <div class="metric-value" id="m-err">—</div>
+    <div class="metric-sub" id="m-err-sub">aguardando reprocessamento</div>
+  </div>
+  <div class="metric pend">
+    <div class="metric-label">Pendentes</div>
+    <div class="metric-value" id="m-pend">—</div>
+    <div class="metric-sub">em fila / não iniciados</div>
+  </div>
+</div>
+
+<div class="mid-grid">
+  <div class="card">
+    <div class="card-title">Tempo médio por etapa</div>
+    <div id="etapas-list">
+      <div class="state-msg"><span class="spinner"></span>carregando</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Taxa de sucesso por etapa</div>
+    <div id="bars-status">
+      <div class="state-msg"><span class="spinner"></span>carregando</div>
+    </div>
+    <hr class="divider">
+    <div class="card-title">Precisão média (σ)</div>
+    <div id="bars-sigma">
+      <div class="state-msg"><span class="spinner"></span>carregando</div>
+    </div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <div class="table-header">
+    <div class="table-header-left">Registros</div>
+    <div class="table-header-right" id="table-count">—</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Dia</th>
+        <th>Estação</th>
+        <th>Ano</th>
+        <th>Download</th>
+        <th>PPP</th>
+        <th>Drive</th>
+        <th>Marco</th>
+        <th>Lat / Lon</th>
+        <th>σ Lat</th>
+        <th>σ Lon</th>
+        <th>σ H</th>
+        <th>UTM N</th>
+        <th>UTM E</th>
+        <th>Atualizado em</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="12" class="state-msg"><span class="spinner"></span>carregando dados...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <div class="footer-left">RBMC · IBGE-PPP Pipeline · Supabase</div>
+  <div id="last-update">—</div>
+</div>
+
+<script>
+let todosRegistros = [];
+let todosResultados = [];
+
+function headers() {
+  return {
+    'apikey': CONFIG.key,
+    'Authorization': 'Bearer ' + CONFIG.key,
+    'Content-Type': 'application/json'
+  };
+}
+
+async function fetchAll(path) {
+  const res = await fetch(CONFIG.url + '/rest/v1/' + path, { headers: headers() });
+  if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+  return res.json();
+}
+
+function filtros() {
+  return {
+    estacao: document.getElementById('sel-estacao').value,
+    ano: document.getElementById('sel-ano').value
+  };
+}
+
+function aplicarFiltros(arr) {
+  const f = filtros();
+  return arr.filter(r => {
+    if (f.estacao && r.estacao !== f.estacao) return false;
+    if (f.ano && r.ano !== f.ano) return false;
+    return true;
+  });
+}
+
+function popularSelects(registros) {
+  const estacoes = [...new Set(registros.map(r => r.estacao).filter(Boolean))].sort();
+  const anos     = [...new Set(registros.map(r => r.ano).filter(Boolean))].sort();
+  const selE = document.getElementById('sel-estacao');
+  const selA = document.getElementById('sel-ano');
+  const veE = selE.value, veA = selA.value;
+  selE.innerHTML = '<option value="">Todas as estações</option>' + estacoes.map(e => `<option value="${e}">${e.toUpperCase()}</option>`).join('');
+  selA.innerHTML = '<option value="">Todos os anos</option>' + anos.map(a => `<option value="${a}">${a}</option>`).join('');
+  selE.value = veE; selA.value = veA;
+}
+
+function renderMetrics(registros) {
+  const total = registros.length;
+  const ok    = registros.filter(r => r.status_download==='ok' && r.status_ppp==='ok' && r.status_drive==='ok').length;
+  const err   = registros.filter(r => r.status_download==='erro' || r.status_ppp==='erro' || r.status_drive==='erro').length;
+  const pend  = registros.filter(r => r.status_download==='pendente' || r.status_ppp==='pendente' || r.status_drive==='pendente').length;
+  const pct   = total > 0 ? Math.round(ok/total*100) : 0;
+
+  document.getElementById('m-total').textContent = total;
+  document.getElementById('m-ok').textContent    = ok;
+  document.getElementById('m-err').textContent   = err;
+  document.getElementById('m-pend').textContent  = pend;
+  document.getElementById('m-ok-pct').textContent = pct + '% do total';
+
+  const f = filtros();
+  let sub = '';
+  if (f.estacao) sub += f.estacao.toUpperCase();
+  if (f.ano) sub += (sub ? ' · ' : '') + f.ano;
+  document.getElementById('header-sub').textContent = sub || 'todas as estações e anos';
+}
+
+function renderEtapas(registros) {
+  const el = document.getElementById('etapas-list');
+
+  function diffSec(a, b) {
+    if (!a || !b) return null;
+    const da = new Date(a), db = new Date(b);
+    if (isNaN(da) || isNaN(db)) return null;
+    return Math.abs((db - da) / 1000);
+  }
+
+  function fmtSec(s) {
+    if (s === null || s === undefined) return '—';
+    if (s < 60) return Math.round(s) + 's';
+    return Math.floor(s/60) + 'm ' + Math.round(s%60) + 's';
+  }
+
+  function stats(arr) {
+    const valid = arr.filter(v => v !== null);
+    if (!valid.length) return { avg: null, min: null, max: null };
+    return {
+      avg: valid.reduce((a,b)=>a+b,0)/valid.length,
+      min: Math.min(...valid),
+      max: Math.max(...valid)
+    };
+  }
+
+  const temHorarios = registros.some(r => r.iniciado_download_em || r.concluido_download_em);
+
+  if (!temHorarios) {
+    el.innerHTML = `
+      <div class="etapa-row">
+        <div>
+          <div class="etapa-name" style="color:var(--muted);font-size:12px">Adicione colunas de timestamp por etapa</div>
+          <div class="etapa-range">iniciado_download_em · concluido_download_em · enviado_ppp_em · concluido_ppp_em · concluido_drive_em</div>
+        </div>
+      </div>
+      <div class="etapa-row etapa-total" style="margin-top:8px">
+        <div>
+          <div class="etapa-name">Tempo total (criado → atualizado)</div>
+          <div class="etapa-range">via criado_em e atualizado_em</div>
+        </div>
+        <div class="etapa-time" id="tempo-total-val">—</div>
+      </div>`;
+
+    const totais = registros
+      .filter(r => r.status_download==='ok' && r.status_ppp==='ok' && r.status_drive==='ok')
+      .map(r => diffSec(r.criado_em, r.atualizado_em));
+    const st = stats(totais);
+    const el2 = document.getElementById('tempo-total-val');
+    if (el2 && st.avg !== null) {
+      el2.textContent = fmtSec(st.avg);
+      el2.closest('.etapa-row').querySelector('.etapa-range').textContent =
+        'mín ' + fmtSec(st.min) + ' · máx ' + fmtSec(st.max);
+    }
+    return;
+  }
+
+  const etapas = [
+    { label: 'Download ZIP',     a: 'iniciado_download_em',  b: 'concluido_download_em' },
+    { label: 'Descompactar',     a: 'concluido_download_em', b: 'enviado_ppp_em' },
+    { label: 'IBGE-PPP',         a: 'enviado_ppp_em',        b: 'concluido_ppp_em' },
+    { label: 'Download result.', a: 'concluido_ppp_em',      b: 'concluido_drive_em' },
+    { label: 'Upload Drive',     a: 'concluido_ppp_em',      b: 'concluido_drive_em' },
+  ];
+
+  let html = '';
+  let totalAvg = 0;
+  etapas.forEach(e => {
+    const diffs = registros.map(r => diffSec(r[e.a], r[e.b]));
+    const st = stats(diffs);
+    totalAvg += st.avg ?? 0;
+    html += `<div class="etapa-row">
+      <div>
+        <div class="etapa-name">${e.label}</div>
+        <div class="etapa-range">${st.min!==null ? 'mín '+fmtSec(st.min)+' · máx '+fmtSec(st.max) : 'sem dados'}</div>
+      </div>
+      <div class="etapa-time">${fmtSec(st.avg)}</div>
+    </div>`;
+  });
+
+  html += `<div class="etapa-row etapa-total" style="margin-top:4px">
+    <div><div class="etapa-name">Tempo total médio</div></div>
+    <div class="etapa-time">${fmtSec(totalAvg)}</div>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+function renderBars(registros, resultados) {
+  const elS = document.getElementById('bars-status');
+  const elSig = document.getElementById('bars-sigma');
+
+  const total = registros.length || 1;
+
+  function pct(campo, val) {
+    return Math.round(registros.filter(r => r[campo]===val).length / total * 100);
+  }
+
+  function bar(label, pctVal, color) {
+    return `<div class="bar-row">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pctVal}%;background:${color}"></div></div>
+      <div class="bar-val">${pctVal}%</div>
+    </div>`;
+  }
+
+  elS.innerHTML =
+    bar('Download',  pct('status_download','ok'), 'var(--green)') +
+    bar('PPP',       pct('status_ppp','ok'),      'var(--green)') +
+    bar('Drive',     pct('status_drive','ok'),     'var(--green)');
+
+  function mediaNum(campo) {
+    const vals = resultados
+      .map(r => parseFloat((r[campo]||'').replace(',','.')))
+      .filter(v => !isNaN(v));
+    if (!vals.length) return null;
+    return vals.reduce((a,b)=>a+b,0)/vals.length;
+  }
+
+  const sLat  = mediaNum('sigma_lat');
+  const sLon  = mediaNum('sigma_lon');
+  const sHgeo = mediaNum('sigma_hgeo');
+
+  function fmtSigma(v) {
+    return v !== null ? v.toFixed(3) + ' m' : '—';
+  }
+
+  function barSigma(label, val, maxVal) {
+    const pctVal = val !== null ? Math.min(Math.round((val/maxVal)*100), 100) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pctVal}%;background:var(--blue)"></div></div>
+      <div class="bar-val">${fmtSigma(val)}</div>
+    </div>`;
+  }
+
+  const maxSigma = Math.max(sLat||0, sLon||0, sHgeo||0, 0.01);
+  elSig.innerHTML = barSigma('σ Lat',  sLat,  maxSigma) +
+                    barSigma('σ Lon',  sLon,  maxSigma) +
+                    barSigma('σ H',    sHgeo, maxSigma);
+}
+
+function badge(status) {
+  if (!status || status === '—') return `<span class="badge badge-none">—</span>`;
+  if (status === 'ok')      return `<span class="badge badge-ok">ok</span>`;
+  if (status === 'erro')    return `<span class="badge badge-err">erro</span>`;
+  if (status === 'pendente') return `<span class="badge badge-pend">pend</span>`;
+  return `<span class="badge badge-none">${status}</span>`;
+}
+
+function fmtDt(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString('pt-BR') + ' ' +
+    d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+}
+
+function renderTabela(registros, resultados) {
+  const tbody = document.getElementById('tbody');
+  document.getElementById('table-count').textContent = registros.length + ' registros';
+
+  if (!registros.length) {
+    tbody.innerHTML = '<tr><td colspan="14" class="state-msg">nenhum registro encontrado</td></tr>';
+    return;
+  }
+
+  const resMap = {};
+  resultados.forEach(r => { resMap[r.url_download] = r; });
+
+  tbody.innerHTML = [...registros]
+    .sort((a,b) => (b.dia_corrido||'').localeCompare(a.dia_corrido||''))
+    .map(r => {
+      const res = resMap[r.url_download] || {};
+      const errMsg = r.erro_msg
+        ? `<div class="err-detail">${r.erro_msg.substring(0,60)}${r.erro_msg.length>60?'…':''}</div>`
+        : '';
+      return `<tr>
+        <td class="mono-bright">${r.dia_corrido || '—'}</td>
+        <td>${(r.estacao||'—').toUpperCase()}</td>
+        <td class="mono">${r.ano || '—'}</td>
+        <td>${badge(r.status_download)}${r.status_download==='erro'?errMsg:''}</td>
+        <td>${badge(r.status_ppp)}</td>
+        <td>${badge(r.status_drive)}</td>
+        <td class="mono">${res.marco || '—'}</td>
+        <td class="mono">${res.lat ? res.lat.trim() : '—'}<br><span style="color:var(--muted)">${res.lon ? res.lon.trim() : ''}</span></td>
+        <td class="mono">${res.sigma_lat || '—'}</td>
+        <td class="mono">${res.sigma_lon || '—'}</td>
+        <td class="mono">${res.sigma_hgeo || '—'}</td>
+        <td class="mono">${res.utmn || '—'}</td>
+        <td class="mono">${res.utme || '—'}</td>
+        <td class="mono">${fmtDt(r.atualizado_em)}</td>
+      </tr>`;
+    }).join('');
+}
+
+async function loadAll() {
+  if (CONFIG.key === 'COLE_SUA_ANON_KEY_AQUI') {
+    document.getElementById('config-banner').classList.add('show');
+    document.getElementById('tbody').innerHTML =
+      '<tr><td colspan="12" class="state-msg">Configure a anon key do Supabase no topo do script.</td></tr>';
+    return;
+  }
+
+  try {
+    document.getElementById('tbody').innerHTML =
+      '<tr><td colspan="14" class="state-msg"><span class="spinner"></span>buscando dados...</td></tr>';
+
+    const [registros, resultados] = await Promise.all([
+      fetchAll('registros_ibge?select=*&order=dia_corrido.desc&limit=1000'),
+      fetchAll('resultados_ppp?select=*&limit=1000')
+    ]);
+
+    todosRegistros  = registros;
+    todosResultados = resultados;
+
+    popularSelects(registros);
+    renderView();
+
+    document.getElementById('last-update').textContent =
+      'atualizado às ' + new Date().toLocaleTimeString('pt-BR');
+
+  } catch(e) {
+    document.getElementById('tbody').innerHTML =
+      `<tr><td colspan="14" class="state-msg">Erro ao conectar ao Supabase: ${e.message}</td></tr>`;
+    document.getElementById('header-sub').textContent = 'erro de conexão';
+  }
+}
+
+function renderView() {
+  const reg = aplicarFiltros(todosRegistros);
+  const res = todosResultados.filter(r => {
+    const match = todosRegistros.find(x => x.url_download === r.url_download);
+    if (!match) return true;
+    const f = filtros();
+    if (f.estacao && match.estacao !== f.estacao) return false;
+    if (f.ano && match.ano !== f.ano) return false;
+    return true;
+  });
+
+  renderMetrics(reg);
+  renderEtapas(reg);
+  renderBars(reg, res);
+  renderTabela(reg, res);
+}
+
+document.getElementById('sel-estacao').addEventListener('change', renderView);
+document.getElementById('sel-ano').addEventListener('change', renderView);
+
+loadAll();
+</script>
+</body>
+</html>
