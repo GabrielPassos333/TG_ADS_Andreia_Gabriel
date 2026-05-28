@@ -133,12 +133,6 @@ CREATE TABLE IF NOT EXISTS resultados_ppp (
   criado_em       TIMESTAMP       NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_registros_estacao   ON registros_ibge (estacao);
-CREATE INDEX IF NOT EXISTS idx_registros_ano       ON registros_ibge (ano);
-CREATE INDEX IF NOT EXISTS idx_registros_status    ON registros_ibge (status_download, status_ppp, status_drive);
-CREATE INDEX IF NOT EXISTS idx_resultados_url      ON resultados_ppp (url_download);
-CREATE INDEX IF NOT EXISTS idx_resultados_marco    ON resultados_ppp (marco);
-CREATE INDEX IF NOT EXISTS idx_resultados_processo ON resultados_ppp (processo_em);
 ```
 
 ### MySQL — servidor local
@@ -291,7 +285,7 @@ Isso popula o banco com todos os registros em status `pendente`. Esta fase só p
 
 ### Dashboard
 
-Abra o arquivo `dashboard_cavalo.html` em qualquer navegador. Antes da primeira abertura, edite o arquivo e substitua `COLE_SUA_ANON_KEY_AQUI` pela **anon key** do seu projeto Supabase.
+Abra o arquivo `index.html` em qualquer navegador. Antes da primeira abertura, edite o arquivo e substitua `COLE_SUA_ANON_KEY_AQUI` pela **anon key** do seu projeto Supabase.
 
 ---
 
@@ -300,8 +294,8 @@ Abra o arquivo `dashboard_cavalo.html` em qualquer navegador. Antes da primeira 
 ```
 ├── TG_ADS.json                  # Workflow principal (n8n)
 ├── index.html                   # Dashboard de monitoramento
-├── schema_rbmc_Postgres.sql     # CREATE TABLE (Postgres)
-├── schema_rbmc_MySQL.sql        # CREATE TABLE (Postgres)
+├── schema_rbmc_Postgres.sql     # CREATE TABLE
+├── schema_rbmc_MySQL.sql        # CREATE TABLE
 └── README.md
 ```
 

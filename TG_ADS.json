@@ -1,0 +1,1552 @@
+{
+  "name": "TG_ADS",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -784,
+        752
+      ],
+      "id": "a03c3806-d4de-414c-8ff7-5960b4de6bc0",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "content": "## FASE 1 — Preparar ambiente\nRoda UMA VEZ para popular o banco.\nNão precisa rodar novamente a menos que queira adicionar novos dias.",
+        "height": 116,
+        "width": 504,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -816,
+        160
+      ],
+      "id": "2e1174ae-499f-44a9-ba14-05d6f576ddb4",
+      "name": "Nota Fase 1"
+    },
+    {
+      "parameters": {
+        "content": "## FASE 2 — Executar / Retomar\nBusca no banco todos os registros pendentes ou com erro e processa.\nPode rodar múltiplas vezes com segurança.",
+        "height": 116,
+        "width": 520,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -816,
+        496
+      ],
+      "id": "ae9b3ac2-932c-46db-b5c2-f6c5197bf99e",
+      "name": "Nota Fase 2"
+    },
+    {
+      "parameters": {
+        "content": "## Estratégia dual-write\n- Postgres (Supabase) = banco PRIMÁRIO\n  Controla status e orquestra o fluxo\n- MySQL (servidor local) = banco BACKUP\n  Replica INSERT/UPDATE em paralelo\n  Falha no MySQL NÃO trava o fluxo principal\n\nO SELECT de controle sempre vem do Postgres.",
+        "height": 236,
+        "width": 316,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        304
+      ],
+      "id": "759e17e7-a360-49da-af57-0cbd3b335f2b",
+      "name": "Estratégia dual-write"
+    },
+    {
+      "parameters": {
+        "content": "## CREATE TABLE — Postgres (Supabase)\n```sql\nCREATE TABLE IF NOT EXISTS registros_ibge (\n  id              SERIAL PRIMARY KEY,\n  estacao         TEXT,\n  ano             TEXT,\n  dia_corrido     TEXT,\n  url_download    TEXT UNIQUE,\n  status_download TEXT DEFAULT 'pendente',\n  status_ppp      TEXT DEFAULT 'pendente',\n  status_drive    TEXT DEFAULT 'pendente',\n  erro_msg        TEXT,\n  arquivo_ppp     TEXT,\n  criado_em       TIMESTAMP DEFAULT NOW(),\n  atualizado_em   TIMESTAMP DEFAULT NOW(),\n  tempo_execucao  NUMERIC(10,3)\n);\n\nCREATE TABLE IF NOT EXISTS resultados_ppp (\n  id              SERIAL PRIMARY KEY,\n  registro_id     INT REFERENCES registros_ibge(id),\n  url_download    TEXT,\n  link_zip        TEXT,\n  status_ppp      TEXT,\n  processo_em     TIMESTAMP,\n  rinex           TEXT, marco TEXT,\n  inicio          TEXT, fim TEXT,\n  modo            TEXT, antena TEXT,\n  altant          TEXT, intervalo TEXT,\n  frequencia      TEXT, observacao TEXT,\n  orbita          TEXT, datum TEXT,\n  lat             TEXT, lon TEXT,\n  hgeo            TEXT, sigma_lat TEXT,\n  sigma_lon       TEXT, sigma_hgeo TEXT,\n  utmn            TEXT, \n  utme            TEXT,\n  mc              TEXT, \n  modelo_geoidal  TEXT,\n  fator_correcao  TEXT, \n  incerteza       TEXT,\n  hnor            TEXT,\n  criado_em       TIMESTAMP DEFAULT NOW()\n);\n```",
+        "height": 752,
+        "width": 524
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        384,
+        -48
+      ],
+      "id": "8cb1a879-996d-4549-8423-28ea51444b44",
+      "name": "Schema Postgres"
+    },
+    {
+      "parameters": {
+        "content": "## CREATE TABLE — MySQL (servidor local)\n```sql\nCREATE TABLE IF NOT EXISTS registros_ibge (\n  id              INT AUTO_INCREMENT PRIMARY KEY,\n  estacao         VARCHAR(50),\n  ano             VARCHAR(10),\n  dia_corrido     VARCHAR(10),\n  url_download    VARCHAR(500) UNIQUE,\n  status_download VARCHAR(20) DEFAULT 'pendente',\n  status_ppp      VARCHAR(20) DEFAULT 'pendente',\n  status_drive    VARCHAR(20) DEFAULT 'pendente',\n  erro_msg        TEXT,\n  arquivo_ppp     TEXT,\n  criado_em       DATETIME DEFAULT NOW(),\n  atualizado_em   DATETIME DEFAULT NOW(),\n  tempo_execucao \n);\n\nCREATE TABLE IF NOT EXISTS resultados_ppp (\n  id              INT AUTO_INCREMENT PRIMARY KEY,\n  registro_id     INT,\n  url_download    VARCHAR(500),\n  link_zip        TEXT,\n  status_ppp      VARCHAR(20),\n  processo_em     DATETIME,\n  rinex           VARCHAR(100), marco VARCHAR(50),\n  inicio          VARCHAR(50), fim VARCHAR(50),\n  modo            VARCHAR(50), antena VARCHAR(100),\n  altant          VARCHAR(50), intervalo VARCHAR(50),\n  frequencia      VARCHAR(20), observacao VARCHAR(100),\n  orbita          VARCHAR(50), datum VARCHAR(100),\n  lat             VARCHAR(50), lon VARCHAR(50),\n  hgeo            VARCHAR(50), sigma_lat VARCHAR(30),\n  sigma_lon       VARCHAR(30), sigma_hgeo VARCHAR(30),\n  utmn            VARCHAR(50), \n  utme            VARCHAR(50),\n  mc              VARCHAR(20), modelo_geoidal VARCHAR(100),\n  fator_correcao  VARCHAR(50), incerteza VARCHAR(50),\n  hnor            VARCHAR(50),\n  criado_em       DATETIME DEFAULT NOW()\n);\n```",
+        "height": 712,
+        "width": 592
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        -32
+      ],
+      "id": "f1f6cecb-8a2e-4516-97b5-d1cee1d412ad",
+      "name": "Schema MySQL"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4d7c4fa4-2305-4228-9678-1edf878b0a26",
+              "name": "estacao",
+              "value": "vico",
+              "type": "string"
+            },
+            {
+              "id": "10bb298f-13d5-4f6f-b333-ceb00dc54c52",
+              "name": "ano",
+              "value": "2021",
+              "type": "string"
+            },
+            {
+              "id": "ee151855-05b0-477c-a479-c724740a8c22",
+              "name": "primeiro_dia",
+              "value": "351",
+              "type": "string"
+            },
+            {
+              "id": "531d94f4-d0fa-4067-835d-06bd028b97e1",
+              "name": "ultimo_dia",
+              "value": "365",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -688,
+        288
+      ],
+      "id": "cbfbf42a-48ba-47e8-834b-01f3794be94d",
+      "name": "INSERIR DADOS"
+    },
+    {
+      "parameters": {
+        "jsCode": "const estacao = $input.item.json.estacao;\nconst ano = $input.item.json.ano;\nconst primeiroDia = parseInt($input.item.json.primeiro_dia);\nconst ultimoDia = parseInt($input.item.json.ultimo_dia);\n\nconst linksParaBaixar = [];\n\nfor (let dia = primeiroDia; dia <= ultimoDia; dia++) {\n  const diaFormatado = String(dia).padStart(3, '0');\n  const nomeArquivo = `${estacao}${diaFormatado}1.zip`;\n  const url = `https://geoftp.ibge.gov.br/informacoes_sobre_posicionamento_geodesico/rbmc/dados/${ano}/${diaFormatado}/${nomeArquivo}`;\n\n  linksParaBaixar.push({\n    json: {\n      url_download: url,\n      estacao: estacao,\n      ano: ano,\n      dia_corrido: diaFormatado\n    }\n  });\n}\n\nreturn linksParaBaixar;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        288
+      ],
+      "id": "56676c80-e6b1-4176-a1a3-99f764560b6b",
+      "name": "Gerar Links"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO registros_ibge (estacao, ano, dia_corrido, url_download, status_download, status_ppp, status_drive)\nVALUES (\n  '{{ $json.estacao }}',\n  '{{ $json.ano }}',\n  '{{ $json.dia_corrido }}',\n  '{{ $json.url_download }}',\n  'pendente',\n  'pendente',\n  'pendente'\n)\nON CONFLICT (url_download) DO NOTHING;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -288,
+        224
+      ],
+      "id": "f84fa9e1-adfb-43f9-90a2-60fa0ceb0471",
+      "name": "INSERT Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT IGNORE INTO registros_ibge (estacao, ano, dia_corrido, url_download, status_download, status_ppp, status_drive)\nVALUES (\n  '{{ $json.estacao }}',\n  '{{ $json.ano }}',\n  '{{ $json.dia_corrido }}',\n  '{{ $json.url_download }}',\n  'pendente',\n  'pendente',\n  'pendente'\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -288,
+        368
+      ],
+      "id": "62237ec3-90f1-40a7-9d95-28ef0682b7fe",
+      "name": "INSERT MySQL (backup)",
+      "credentials": {
+        "mySql": {
+          "id": "BjuqVqLPrpnaDl6p",
+          "name": "MySQL Raspeberry_TG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM registros_ibge\nWHERE status_download IN ('pendente', 'erro')\n   OR status_ppp IN ('pendente', 'erro')\n   OR status_drive IN ('pendente', 'erro')\nORDER BY dia_corrido ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -624,
+        752
+      ],
+      "id": "ce8c5535-016f-4e49-9fac-805461d62c54",
+      "name": "SELECT pendentes (Postgres)",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -416,
+        752
+      ],
+      "id": "96d25edb-cb3c-436a-8273-ccf3ad1b96be",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Loop Over Items').item.json.url_download }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -32,
+        768
+      ],
+      "id": "b4a114ae-4007-4186-b6b0-63f74303ac9b",
+      "name": "Baixar ZIP do IBGE",
+      "alwaysOutputData": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_download='erro', erro_msg='Falha ao baixar: {{ $json.error.message ?? \"erro desconhecido\" }}', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        64,
+        1024
+      ],
+      "id": "6be323e7-ea70-4cc9-a971-c35a7e913736",
+      "name": "Erro download: Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_download='erro', erro_msg='Falha ao baixar', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        240,
+        1024
+      ],
+      "id": "6e50e722-6312-425b-8875-7e503389c0fa",
+      "name": "Erro download: MySQL (backup)",
+      "credentials": {
+        "mySql": {
+          "id": "BjuqVqLPrpnaDl6p",
+          "name": "MySQL Raspeberry_TG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_download='ok', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        128,
+        416
+      ],
+      "id": "2dbc0b3e-1e59-4e9c-913a-81c6a4a95b79",
+      "name": "Download ok: Postgres",
+      "retryOnFail": false,
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_download='ok', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        160,
+        592
+      ],
+      "id": "418383c0-1053-4f08-9cea-1e763e8d249b",
+      "name": "Download ok: MySQL (backup)",
+      "credentials": {
+        "mySql": {
+          "id": "BjuqVqLPrpnaDl6p",
+          "name": "MySQL Raspeberry_TG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        768
+      ],
+      "id": "7920345b-091c-4f50-ba96-1a6457451070",
+      "name": "Descompactar ZIP",
+      "alwaysOutputData": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_download='erro', erro_msg='Falha ao descompactar ZIP', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        496,
+        1040
+      ],
+      "id": "6744e6c9-e845-4f80-b55e-60d98e272caa",
+      "name": "Erro descompactar: Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_download='erro', erro_msg='Falha ao descompactar ZIP', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        720,
+        1040
+      ],
+      "id": "dc8ae801-6147-4f88-96a9-c89503f2a343",
+      "name": "Erro descompactar: MySQL (backup)",
+      "credentials": {
+        "mySql": {
+          "id": "BjuqVqLPrpnaDl6p",
+          "name": "MySQL Raspeberry_TG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "let results = [];\n\nfor (item of items) {\n    for (key of Object.keys(item.binary)) {\n        results.push({\n            json: {\n                fileName: item.binary[key].fileName,\n                url_download: $('Loop Over Items').item.json.url_download,\n                estacao: $('Loop Over Items').item.json.estacao,\n                ano: $('Loop Over Items').item.json.ano\n            },\n            binary: {\n                data: item.binary[key],\n            }\n        });\n    }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        752
+      ],
+      "id": "049477a1-8c2e-4533-a9b5-ffadba653ac1",
+      "name": "Ler nomes dos arquivos"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ea3d0963",
+              "leftValue": "={{ $json.fileName }}",
+              "rightValue": "d",
+              "operator": {
+                "type": "string",
+                "operation": "endsWith"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        624,
+        752
+      ],
+      "id": "70563fab-12cb-41f3-b52a-84d8fc264e61",
+      "name": "Filtrar arquivo .d"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://servicodados.ibge.gov.br/api/v1/ppp",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "arquivo",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "tipo-levantamento",
+              "value": "estatico"
+            },
+            {
+              "name": "modelo-antena",
+              "value": "NONE"
+            },
+            {
+              "name": "email",
+              "value": "email@email.com"
+            },
+            {
+              "name": "autorizacao-uso",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        752
+      ],
+      "id": "d728bccb-4603-4e36-ad8c-72947932bfc9",
+      "name": "IBGE-PPP",
+      "alwaysOutputData": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_ppp='erro', erro_msg='Falha ao enviar ao IBGE-PPP: {{ $json.error.message ?? \"erro desconhecido\" }}', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1088,
+        1072
+      ],
+      "id": "1c69c7b1-f0b3-4745-87ea-3cecfa6b6f03",
+      "name": "Erro PPP: Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_ppp='erro', erro_msg='Falha ao enviar ao IBGE-PPP', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        1328,
+        1072
+      ],
+      "id": "fc3f17ff-f581-41c7-8d88-5ec738d477ac",
+      "name": "Erro PPP: MySQL (backup)",
+      "credentials": {
+        "mySql": {
+          "id": "BjuqVqLPrpnaDl6p",
+          "name": "MySQL Raspeberry_TG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resposta = Array.isArray($input.item.json) ? $input.item.json[0] : $input.item.json;\nconst resumo = resposta.resumo ?? {};\nconst url_download = $('Loop Over Items').item.json.url_download;\n\nconst s = (v) => (v ?? '').toString().trim();\n\nconst parseDataIBGE = (str) => {\n  if (!str) return null;\n  try {\n    return str.replace(/\\//g, '-').replace(' ', 'T');\n  } catch(e) { return null; }\n};\n\nreturn [{\n  json: {\n    url_download,\n    link_zip: s(resposta.link),\n    status_ppp: s(resposta.status),\n    processo_em: parseDataIBGE(s(resumo.PROCES)),\n    rinex: s(resumo.RINEX),\n    marco: s(resumo.MARCO),\n    inicio: s(resumo.INICIO),\n    fim: s(resumo.FIM),\n    modo: s(resumo.MODO),\n    antena: s(resumo.ANTENA),\n    altant: s(resumo.ALTANT),\n    intervalo: s(resumo.INTERV),\n    frequencia: s(resumo.FREQ),\n    observacao: s(resumo.OBSERV),\n    orbita: s(resumo.ORBITA),\n    datum: s(resumo.DATUM),\n    lat: s(resumo.LAT),\n    lon: s(resumo.LON),\n    hgeo: s(resumo.HGEO),\n    sigma_lat: s(resumo.SLAT),\n    sigma_lon: s(resumo.SLON),\n    sigma_hgeo: s(resumo.SHGEO),\n    utmn: s(resumo.UTMN),\n    utme: s(resumo.UTME),\n    mc: s(resumo.MC),\n    modelo_geoidal: s(resumo.MODELO),\n    fator_correcao: s(resumo.FATCOR),\n    incerteza: s(resumo.INCERT),\n    hnor: s(resumo.HNOR)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        736
+      ],
+      "id": "de55fd4a-b948-4c2e-a265-addb4a70fa08",
+      "name": "Parsear resumo PPP"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO resultados_ppp (\n  registro_id, url_download, link_zip, status_ppp, processo_em,\n  rinex, marco, inicio, fim, modo, antena, altant, intervalo,\n  frequencia, observacao, orbita, datum,\n  lat, lon, hgeo, sigma_lat, sigma_lon, sigma_hgeo,\n  utmn, utme, mc, modelo_geoidal, fator_correcao, incerteza, hnor\n)\nSELECT\n  r.id,\n  '{{ $json.url_download }}', '{{ $json.link_zip }}', '{{ $json.status_ppp }}',\n  {{ $json.processo_em ? \"'\" + $json.processo_em + \"'\" : 'NULL' }},\n  '{{ $json.rinex }}', '{{ $json.marco }}', '{{ $json.inicio }}', '{{ $json.fim }}',\n  '{{ $json.modo }}', '{{ $json.antena }}', '{{ $json.altant }}', '{{ $json.intervalo }}',\n  '{{ $json.frequencia }}', '{{ $json.observacao }}', '{{ $json.orbita }}', '{{ $json.datum }}',\n  '{{ $json.lat }}', '{{ $json.lon }}', '{{ $json.hgeo }}',\n  '{{ $json.sigma_lat }}', '{{ $json.sigma_lon }}', '{{ $json.sigma_hgeo }}',\n  '{{ $json.utmn }}', '{{ $json.utme }}', '{{ $json.mc }}',\n  '{{ $json.modelo_geoidal }}', '{{ $json.fator_correcao }}', '{{ $json.incerteza }}', '{{ $json.hnor }}'\nFROM registros_ibge r WHERE r.url_download = '{{ $json.url_download }}';\n\nUPDATE registros_ibge SET status_ppp='ok', arquivo_ppp='{{ $json.link_zip }}', atualizado_em=NOW() WHERE url_download='{{ $json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1232,
+        784
+      ],
+      "id": "6c0c2afa-6010-4b4c-8a64-2aecb59394d9",
+      "name": "Salvar resultado PPP: Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO resultados_ppp (\n  url_download, link_zip, status_ppp, processo_em,\n  rinex, marco, inicio, fim, modo, antena, altant, intervalo,\n  frequencia, observacao, orbita, datum,\n  lat, lon, hgeo, sigma_lat, sigma_lon, sigma_hgeo,\n  utmn, utme, mc, modelo_geoidal, fator_correcao, incerteza, hnor\n) VALUES (\n  '{{ $json.url_download }}', '{{ $json.link_zip }}', '{{ $json.status_ppp }}',\n  {{ $json.processo_em ? \"'\" + $json.processo_em + \"'\" : 'NULL' }},\n  '{{ $json.rinex }}', '{{ $json.marco }}', '{{ $json.inicio }}', '{{ $json.fim }}',\n  '{{ $json.modo }}', '{{ $json.antena }}', '{{ $json.altant }}', '{{ $json.intervalo }}',\n  '{{ $json.frequencia }}', '{{ $json.observacao }}', '{{ $json.orbita }}', '{{ $json.datum }}',\n  '{{ $json.lat }}', '{{ $json.lon }}', '{{ $json.hgeo }}',\n  '{{ $json.sigma_lat }}', '{{ $json.sigma_lon }}', '{{ $json.sigma_hgeo }}',\n  '{{ $json.utmn }}', '{{ $json.utme }}', '{{ $json.mc }}',\n  '{{ $json.modelo_geoidal }}', '{{ $json.fator_correcao }}', '{{ $json.incerteza }}', '{{ $json.hnor }}'\n);\n\nUPDATE registros_ibge SET status_ppp='ok', arquivo_ppp='{{ $json.link_zip }}', atualizado_em=NOW() WHERE url_download='{{ $json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        1232,
+        624
+      ],
+      "id": "e186e0d0-c883-4de5-b3d6-8951fa550f52",
+      "name": "Salvar resultado PPP: MySQL (backup)",
+      "credentials": {
+        "mySql": {
+          "id": "BjuqVqLPrpnaDl6p",
+          "name": "MySQL Raspeberry_TG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('IBGE-PPP').item.json.link }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1504,
+        736
+      ],
+      "id": "81cc0b75-366e-40d8-b9cd-f5e2c04fca52",
+      "name": "Baixar resultado PPP",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_ppp='erro', erro_msg='Falha ao baixar ZIP de resultado do PPP', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1616,
+        1072
+      ],
+      "id": "a175c45f-9ba8-4776-bd19-02cf7a3560fa",
+      "name": "Erro baixar resultado: Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_ppp='erro', erro_msg='Falha ao baixar ZIP de resultado do PPP', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        1840,
+        1072
+      ],
+      "id": "3534a155-e4e2-47d1-87ee-a4ced3d31844",
+      "name": "Erro baixar resultado: MySQL (backup)",
+      "credentials": {
+        "mySql": {
+          "id": "BjuqVqLPrpnaDl6p",
+          "name": "MySQL Raspeberry_TG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        1712,
+        736
+      ],
+      "id": "9c9f1a06-0c91-4067-ba0d-26390e43f7b8",
+      "name": "Descompactar resultado",
+      "alwaysOutputData": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "let results = [];\n\nfor (item of items) {\n    for (key of Object.keys(item.binary)) {\n        results.push({\n            json: {\n                fileName: item.binary[key].fileName,\n                url_download: $('Loop Over Items').item.json.url_download\n            },\n            binary: {\n                data: item.binary[key],\n            }\n        });\n    }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        736
+      ],
+      "id": "2fd4f9a1-578c-46a7-8a07-5ca56c08a5f2",
+      "name": "Filtrar nomes SUM"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "303fdf38",
+              "leftValue": "={{ $json.fileName }}",
+              "rightValue": ".sum",
+              "operator": {
+                "type": "string",
+                "operation": "endsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2080,
+        736
+      ],
+      "id": "76865837-89df-4f37-9025-a99b1957d55b",
+      "name": "Filtrar .sum"
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1GUZ5QTS-z6Ra31wQQLe2NBzs8QXt17MB",
+          "mode": "list",
+          "cachedResultName": "VICO_2021",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1GUZ5QTS-z6Ra31wQQLe2NBzs8QXt17MB"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2240,
+        736
+      ],
+      "id": "1921887a-9c45-4805-b635-4f9ce8d319c5",
+      "name": "Upload Google Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Z12OqSqgQ47pTk1Q",
+          "name": "Google Drive account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_drive='erro', erro_msg='Falha ao fazer upload no Google Drive', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2416,
+        1136
+      ],
+      "id": "527fc284-8ec4-4713-9877-37f67055754a",
+      "name": "Erro Drive: Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_drive='erro', erro_msg='Falha ao fazer upload no Google Drive', atualizado_em=NOW() WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        2416,
+        976
+      ],
+      "id": "a5fc50e2-c546-4628-bc0e-78928b83c395",
+      "name": "Erro Drive: MySQL (backup)",
+      "credentials": {
+        "mySql": {
+          "id": "BjuqVqLPrpnaDl6p",
+          "name": "MySQL Raspeberry_TG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge SET status_drive='ok', erro_msg=NULL, atualizado_em=NOW(),\ntempo_execucao = {{ Number(($now.toMillis() - $('Inicio da Execução').item.json.inicio_execucao)/1000) }}\n  WHERE url_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2448,
+        736
+      ],
+      "id": "d792b145-439b-40e2-b4e7-e7c2f0331ce0",
+      "name": "Drive ok: Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE registros_ibge \nSET status_drive='ok', \nerro_msg=NULL, \natualizado_em=NOW(),\ntempo_execucao=\n{{ ($now.toMillis() - $('Inicio da Execução').item.json.inicio_execucao)/1000 }}\nWHERE \nurl_download='{{ $('Loop Over Items').item.json.url_download }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        2624,
+        736
+      ],
+      "id": "8df1f286-8d00-495c-a58e-181e85dbfd47",
+      "name": "Drive ok: MySQL (backup)",
+      "notesInFlow": false,
+      "credentials": {
+        "mySql": {
+          "id": "BjuqVqLPrpnaDl6p",
+          "name": "MySQL Raspeberry_TG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## Todos os erros voltam para o Loop\nO fluxo nunca trava — cada erro é registrado\ne o próximo item é processado normalmente.",
+        "height": 400,
+        "width": 2936,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        912
+      ],
+      "id": "9a16d8f9-ef9b-4771-9b71-887d1ac7abf5",
+      "name": "Nota Erros"
+    },
+    {
+      "parameters": {
+        "content": "## MySQL backup\nNós MySQL têm onError: continueRegularOutput\nFalha no MySQL não interrompe o fluxo principal.",
+        "height": 120,
+        "width": 380,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        544
+      ],
+      "id": "c99f5faf-0571-4cb3-b010-f21657467d01",
+      "name": "Nota MySQL backup"
+    },
+    {
+      "parameters": {
+        "chatId": "618657630",
+        "text": "Processamento concluído",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -224,
+        592
+      ],
+      "id": "963ab270-e18e-47f8-9c9f-08ca7c1948cd",
+      "name": "Send a text message",
+      "webhookId": "197e3ae2-e82b-47f4-a5c0-6a6dd4b7993d",
+      "executeOnce": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "kNg8ZZ1ki3LtrMwL",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "eec2ee4f-67b3-4718-974e-ae3f220578f8",
+              "name": "inicio_execucao",
+              "value": "={{ $now.toMillis()}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        768
+      ],
+      "id": "bac58a2c-ea67-4771-96b7-95b013bbd187",
+      "name": "Inicio da Execução"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Você é um especialista em SQL com acesso somente leitura a um banco de dados PostgreSQL de processamento geodésico do projeto RBMC (Rede Brasileira de Monitoramento Contínuo).\n\nSCHEMA DISPONÍVEL:\n\nTabela: registros_ibge\n- estacao         TEXT        — código da estação (ex: 'vico', 'braz')\n- ano             TEXT        — ano do dado (ex: '2023')\n- dia_corrido     TEXT        — dia juliano com 3 dígitos (ex: '121')\n- url_download    TEXT        — URL do arquivo ZIP no FTP do IBGE\n- status_download TEXT        — 'pendente', 'ok' ou 'erro'\n- status_ppp      TEXT        — 'pendente', 'ok' ou 'erro'\n- status_drive    TEXT        — 'pendente', 'ok' ou 'erro'\n- erro_msg        TEXT        — mensagem de erro caso alguma etapa tenha falhado\n- arquivo_ppp     TEXT        — link do resultado no Google Drive\n- criado_em       TIMESTAMP   — quando o registro foi criado\n- atualizado_em   TIMESTAMP   — última atualização do registro\n- inicio_execucao TIMESTAMP   — quando o processamento desse item começou\n- fim_execucao    TIMESTAMP   — quando o processamento desse item terminou\n- tempo_execucao  NUMERIC     — tempo total em segundos\n\nTabela: resultados_ppp\n- registro_id     INT         — referência ao id em registros_ibge\n- url_download    TEXT        — chave de ligação com registros_ibge\n- link_zip        TEXT        — link do ZIP de resultado do IBGE-PPP\n- status_ppp      TEXT        — status retornado pelo IBGE-PPP\n- processo_em     TIMESTAMP   — data e hora do processamento no IBGE-PPP\n- rinex           TEXT        — nome do arquivo RINEX processado\n- marco           TEXT        — nome do marco geodésico (ex: 'VICO')\n- inicio          TEXT        — início da janela de observação\n- fim             TEXT        — fim da janela de observação\n- modo            TEXT        — modo de processamento (ex: 'ESTATICO')\n- antena          TEXT        — modelo da antena\n- altant          TEXT        — altura da antena\n- intervalo       TEXT        — intervalo de gravação (ex: '15,00')\n- frequencia      TEXT        — frequência utilizada (ex: 'L3')\n- observacao      TEXT        — tipo de observação (ex: 'CODIGO&FASE')\n- orbita          TEXT        — tipo de órbita (ex: 'FINAL', 'RAPIDA')\n- datum           TEXT        — datum geodésico (ex: 'SIRGAS2000, época 2000.4')\n- lat             TEXT        — latitude no formato graus minutos segundos\n- lon             TEXT        — longitude no formato graus minutos segundos\n- hgeo            TEXT        — altura geométrica com unidade (ex: '666,04 m')\n- sigma_lat       TEXT        — desvio padrão da latitude (ex: '0,001 m')\n- sigma_lon       TEXT        — desvio padrão da longitude (ex: '0,002 m')\n- sigma_hgeo      TEXT        — desvio padrão da altura geométrica (ex: '0,004 m')\n- utmn            TEXT        — coordenada UTM Norte com unidade\n- utme            TEXT        — coordenada UTM Este com unidade\n- mc              TEXT        — meridiano central da projeção UTM (ex: '-45')\n- modelo_geoidal  TEXT        — modelo geoidal utilizado\n- fator_correcao  TEXT        — fator de correção geoidal\n- incerteza       TEXT        — incerteza do modelo geoidal\n- hnor            TEXT        — altura normal com unidade (ex: '672,78 m')\n- criado_em       TIMESTAMP   — quando o resultado foi salvo\n\nRELACIONAMENTO:\nregistros_ibge.url_download = resultados_ppp.url_download\n\nREGRAS ABSOLUTAS:\n- Retorne APENAS o SQL, sem explicações, sem markdown, sem blocos de código, sem texto antes ou depois\n- Use APENAS comandos SELECT — nunca INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE ou qualquer outro\n- Sempre inclua LIMIT no máximo 500 se a query não tiver cláusula de agregação\n- Consulte apenas as tabelas registros_ibge e resultados_ppp\n- Nunca use subqueries não determinísticas ou funções que modifiquem dados\n- Se a pergunta não puder ser respondida com essas tabelas, retorne exatamente: FORA_DO_ESCOPO\n\nEXEMPLOS:\n\nPergunta: \"quantos registros foram processados com sucesso?\"\nSQL: SELECT COUNT(*) AS total_ok FROM registros_ibge WHERE status_download = 'ok' AND status_ppp = 'ok' AND status_drive = 'ok';\n\nPergunta: \"quais dias tiveram erro no PPP?\"\nSQL: SELECT estacao, ano, dia_corrido, erro_msg FROM registros_ibge WHERE status_ppp = 'erro' ORDER BY dia_corrido ASC LIMIT 500;\n\nPergunta: \"qual a média de tempo de execução por estação?\"\nSQL: SELECT estacao, ROUND(AVG(tempo_execucao)) AS media_segundos, COUNT(*) AS total FROM registros_ibge WHERE tempo_execucao IS NOT NULL GROUP BY estacao ORDER BY media_segundos DESC;\n\nPergunta: \"quais resultados tiveram sigma da altura acima de 0.005?\"\nSQL: SELECT r.marco, r.processo_em, r.sigma_hgeo, r.hgeo FROM resultados_ppp r WHERE REPLACE(SPLIT_PART(r.sigma_hgeo, ' ', 1), ',', '.')::NUMERIC > 0.005 ORDER BY r.processo_em DESC LIMIT 500;\n\nPergunta: \"qual o clima hoje?\"\nSQL: FORA_DO_ESCOPO\n\nPergunta Real: {{ $json.pergunta }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -224,
+        1648
+      ],
+      "id": "a17084ba-9747-424c-afcf-0c3e313ef991",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        1840
+      ],
+      "id": "c174a58c-8b38-42f4-a359-ed9b19eceb5c",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CevQorvid3ltQy3R",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sql = $input.item.json.output.trim();\n\nif (sql === 'FORA_DO_ESCOPO') {\n  throw new Error('FORA_DO_ESCOPO');\n}\n\nconst proibido = /insert|update|delete|drop|alter|truncate|create|grant|revoke/i;\nif (proibido.test(sql)) {\n  throw new Error('SQL_INVALIDO');\n}\n\nif (!/limit\\s+\\d+/i.test(sql)) {\n  return [{ json: { sql: sql.replace(/;?\\s*$/, '') + ' LIMIT 500;' } }];\n}\n\nreturn [{ json: { sql } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        1648
+      ],
+      "id": "96ef7801-978c-4090-b097-69422102ea51",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Você é um assistente especializado em análise de dados geodésicos do projeto RBMC (Rede Brasileira de Monitoramento Contínuo dos Sistemas GNSS).\n\nVocê recebe dois inputs:\n1. A pergunta original do usuário\n2. O resultado bruto de uma consulta no banco de dados PostgreSQL\n\nSeu trabalho é transformar esses dados brutos em uma resposta clara, útil e em português brasileiro.\n\nCONTEXTO DO DOMÍNIO:\n- Os dados são de estações geodésicas de monitoramento contínuo do IBGE\n- Cada registro representa um dia de processamento de uma estação\n- O processamento passa por três etapas: download do arquivo RINEX, processamento no IBGE-PPP e upload no Google Drive\n- Os sigmas (sigma_lat, sigma_lon, sigma_hgeo) indicam a precisão do resultado — valores abaixo de 0,005 m são considerados bons\n- HGEO é a altura geométrica (elipsoidal) e HNOR é a altura normal (ortométrica)\n- dia_corrido é o dia juliano — dia 001 é 1º de janeiro, dia 365 é 31 de dezembro\n- tempo_execucao está em segundos\n\nREGRAS:\n- Responda sempre em português brasileiro\n- Nunca mostre JSON bruto ou SQL na resposta\n- Se o resultado vier vazio, diga claramente que nenhum dado foi encontrado para a pergunta\n- Se o resultado tiver muitas linhas, faça um resumo destacando os pontos mais relevantes — não liste tudo\n- Quando citar valores numéricos, sempre inclua a unidade (metros, segundos, dias)\n- Quando citar datas, converta para formato legível (DD/MM/AAAA)\n- Quando citar dia_corrido, converta para data aproximada se souber o ano, ou explique que é o dia juliano\n- Destaque anomalias quando existirem — dias com erro, sigmas altos, tempos de execução muito acima da média\n- Seja objetivo mas completo — o usuário quer uma análise, não só os números\n- Se os dados permitirem, inclua uma conclusão ou recomendação no final\n\nFORMATO DA RESPOSTA:\n- Use linguagem natural, sem bullets excessivos\n- Para listas longas, agrupe por categoria ou destaque apenas os casos relevantes\n- Para métricas numéricas, use negrito para destacar o valor principal\n- Termine sempre com uma linha de resumo ou conclusão\n\nPERGUNTA ORIGINAL DO USUÁRIO:\n{{ $('pergunta').item.json.pergunta }}\n\nDADOS RETORNADOS PELO BANCO:\n{{ JSON.stringify($('SQL Validado').all().map(r => r.json)) }}\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        368,
+        1648
+      ],
+      "id": "14aaaed4-4711-4b22-a6ff-62899fb94cda",
+      "name": "AI Agent2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        368,
+        1856
+      ],
+      "id": "34a716c6-9563-4595-9e6b-7a49ce4d67bd",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CevQorvid3ltQy3R",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.sql }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        224,
+        1648
+      ],
+      "id": "a54e07d0-359d-4756-ab0a-066b2c2bb749",
+      "name": "SQL Validado",
+      "credentials": {
+        "postgres": {
+          "id": "n3ecVecLL0So3ynt",
+          "name": "SupaConnection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "=618657630",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        640,
+        1648
+      ],
+      "id": "44d48a99-9f8d-48db-8682-dfa04446fd4c",
+      "name": "Send a text message1",
+      "webhookId": "9a2628bd-e5a9-4bdb-abd4-901a2c758071",
+      "credentials": {
+        "telegramApi": {
+          "id": "kNg8ZZ1ki3LtrMwL",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "68da04cb-962d-4d09-8860-99da1aa35094",
+              "name": "pergunta",
+              "value": "média de tempo de processamento da estação vico ano 2021",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -384,
+        1648
+      ],
+      "id": "8d40fe4e-fb92-4f6d-991d-88a267b52f3f",
+      "name": "pergunta",
+      "executeOnce": false
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "SELECT pendentes (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "INSERIR DADOS": {
+      "main": [
+        [
+          {
+            "node": "Gerar Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar Links": {
+      "main": [
+        [
+          {
+            "node": "INSERT Postgres",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "INSERT MySQL (backup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "INSERT Postgres": {
+      "main": [
+        []
+      ]
+    },
+    "SELECT pendentes (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Inicio da Execução",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar ZIP do IBGE": {
+      "main": [
+        [
+          {
+            "node": "Download ok: Postgres",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Download ok: MySQL (backup)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Descompactar ZIP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Erro download: Postgres",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Erro download: MySQL (backup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download ok: Postgres": {
+      "main": [
+        []
+      ]
+    },
+    "Download ok: MySQL (backup)": {
+      "main": [
+        []
+      ]
+    },
+    "Erro download: Postgres": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro download: MySQL (backup)": {
+      "main": [
+        []
+      ]
+    },
+    "Descompactar ZIP": {
+      "main": [
+        [
+          {
+            "node": "Ler nomes dos arquivos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Erro descompactar: Postgres",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Erro descompactar: MySQL (backup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro descompactar: Postgres": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro descompactar: MySQL (backup)": {
+      "main": [
+        []
+      ]
+    },
+    "Ler nomes dos arquivos": {
+      "main": [
+        [
+          {
+            "node": "Filtrar arquivo .d",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar arquivo .d": {
+      "main": [
+        [
+          {
+            "node": "IBGE-PPP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IBGE-PPP": {
+      "main": [
+        [
+          {
+            "node": "Parsear resumo PPP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Erro PPP: Postgres",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Erro PPP: MySQL (backup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro PPP: Postgres": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro PPP: MySQL (backup)": {
+      "main": [
+        []
+      ]
+    },
+    "Parsear resumo PPP": {
+      "main": [
+        [
+          {
+            "node": "Salvar resultado PPP: Postgres",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Salvar resultado PPP: MySQL (backup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar resultado PPP: Postgres": {
+      "main": [
+        [
+          {
+            "node": "Baixar resultado PPP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Erro PPP: Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar resultado PPP: MySQL (backup)": {
+      "main": [
+        []
+      ]
+    },
+    "Baixar resultado PPP": {
+      "main": [
+        [
+          {
+            "node": "Descompactar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Erro baixar resultado: Postgres",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Erro baixar resultado: MySQL (backup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro baixar resultado: Postgres": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro baixar resultado: MySQL (backup)": {
+      "main": [
+        []
+      ]
+    },
+    "Descompactar resultado": {
+      "main": [
+        [
+          {
+            "node": "Filtrar nomes SUM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar nomes SUM": {
+      "main": [
+        [
+          {
+            "node": "Filtrar .sum",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar .sum": {
+      "main": [
+        [
+          {
+            "node": "Upload Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Drive ok: Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Erro Drive: Postgres",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Erro Drive: MySQL (backup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive ok: Postgres": {
+      "main": [
+        [
+          {
+            "node": "Drive ok: MySQL (backup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive ok: MySQL (backup)": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro Drive: Postgres": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro Drive: MySQL (backup)": {
+      "main": [
+        []
+      ]
+    },
+    "Inicio da Execução": {
+      "main": [
+        [
+          {
+            "node": "Baixar ZIP do IBGE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "SQL Validado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SQL Validado": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "pergunta": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e9c38383-778e-4d25-a2cc-ae346b9a7309",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "93a7d87fdfdd83e5921b97737f6998af84afd4764601f974641574866bc5d7e3"
+  },
+  "id": "R0jjDUFdOoQWKzHp",
+  "tags": []
+}

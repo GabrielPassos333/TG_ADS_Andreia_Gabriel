@@ -86,7 +86,6 @@ Dashboard/
 ├── index.html           # Interface principal do dashboard
 ├── styles.css           # Estilos e design responsivo
 ├── config.js            # Credenciais (NÃO fazer commit!)
-├── config.example.js    # Template de configuração
 ├── .gitignore          # Ignora config.js
 └── README.md           # Este arquivo
 ```
@@ -105,34 +104,61 @@ A estrutura esperada no Supabase:
 
 ### Tabela: `registros_ibge`
 ```sql
-- dia_corrido (text)
-- estacao (text)
-- ano (integer)
-- status_download (enum: ok, erro, pendente)
-- status_ppp (enum: ok, erro, pendente)
-- status_drive (enum: ok, erro, pendente)
-- url_download (text)
-- erro_msg (text, opcional)
-- criado_em (timestamp)
-- atualizado_em (timestamp)
-- iniciado_download_em (timestamp, opcional)
-- concluido_download_em (timestamp, opcional)
-- enviado_ppp_em (timestamp, opcional)
-- concluido_ppp_em (timestamp, opcional)
-- concluido_drive_em (timestamp, opcional)
+CREATE TABLE IF NOT EXISTS registros_ibge (
+  id              SERIAL          PRIMARY KEY,
+  estacao         TEXT            NOT NULL,
+  ano             TEXT            NOT NULL,
+  dia_corrido     TEXT            NOT NULL,
+  url_download    TEXT            UNIQUE NOT NULL,
+  status_download TEXT            NOT NULL DEFAULT 'pendente',
+  status_ppp      TEXT            NOT NULL DEFAULT 'pendente',
+  status_drive    TEXT            NOT NULL DEFAULT 'pendente',
+  erro_msg        TEXT,
+  arquivo_ppp     TEXT,
+  criado_em       TIMESTAMP       NOT NULL DEFAULT NOW(),
+  atualizado_em   TIMESTAMP       NOT NULL DEFAULT NOW(),
+  inicio_execucao TIMESTAMP,
+  fim_execucao    TIMESTAMP,
+  tempo_execucao  NUMERIC(10,3)
+);
 ```
 
 ### Tabela: `resultados_ppp`
 ```sql
-- url_download (text) - chave estrangeira
-- marco (text)
-- lat (text)
-- lon (text)
-- sigma_lat (numeric)
-- sigma_lon (numeric)
-- sigma_hgeo (numeric)
-- utmn (text)
-- utme (text)
+CREATE TABLE IF NOT EXISTS resultados_ppp (
+  id              SERIAL          PRIMARY KEY,
+  registro_id     INT             UNIQUE REFERENCES registros_ibge(id),
+  url_download    TEXT            UNIQUE NOT NULL,
+  link_zip        TEXT,
+  status_ppp      TEXT,
+  processo_em     TIMESTAMP,
+  rinex           TEXT,
+  marco           TEXT,
+  inicio          TIMESTAMP,
+  fim             TIMESTAMP,
+  modo            TEXT,
+  antena          TEXT,
+  altant          NUMERIC(8,3),
+  intervalo       NUMERIC(6,2),
+  frequencia      TEXT,
+  observacao      TEXT,
+  orbita          TEXT,
+  datum           TEXT,
+  lat             TEXT,
+  lon             TEXT,
+  hgeo            NUMERIC(10,4),
+  hnor            NUMERIC(10,4),
+  sigma_lat       NUMERIC(8,5),
+  sigma_lon       NUMERIC(8,5),
+  sigma_hgeo      NUMERIC(8,5),
+  utmn            NUMERIC(12,3),
+  utme            NUMERIC(12,3),
+  mc              INT,
+  modelo_geoidal  TEXT,
+  fator_correcao  NUMERIC(8,4),
+  incerteza       NUMERIC(8,4),
+  criado_em       TIMESTAMP       NOT NULL DEFAULT NOW()
+);
 ```
 
 ---
@@ -157,20 +183,8 @@ A estrutura esperada no Supabase:
 
 ### Modificações Locais
 
-Para desenvolver localmente, você pode servir o arquivo com um servidor web simples:
+Para desenvolver localmente, você pode abrir diretamente `index.html` no navegador. 
 
-```bash
-# Python 3
-python -m http.server 8000
-
-# Node.js
-npx http-server
-
-# php
-php -S localhost:8000
-```
-
-Então acesse: `http://localhost:8000`
 
 ### Estrutura do Código
 
@@ -221,17 +235,8 @@ Dashboard desenvolvido com:
 - Validar permissões RLS no Supabase
 - Abrir console do navegador (F12) para ver erros
 
-### Tempos não aparecem
-- Adicione colunas de timestamp nas tabelas do Supabase conforme estrutura acima
 
----
 
-## 📞 Contato & Suporte
-
-**Desenvolvido por:** [Seu Nome]  
-**Instituição:** FATEC Indaiatuba  
-**Curso:** Análise e Desenvolvimento de Sistemas  
-**Ano:** 2024-2026  
 
 ---
 
@@ -251,4 +256,3 @@ Este projeto é fornecido como trabalho acadêmico. Use livremente para fins edu
 ---
 
 **Última atualização:** Maio 2026  
-**Status:** ✅ Em produção
